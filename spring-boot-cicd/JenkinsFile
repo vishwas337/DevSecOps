@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "vishwas7/ci_cd"  // Replace with your Docker Hub username
+        DOCKER_TAG = "latest"
+        DOCKER_CREDENTIALS = credentials('docker-hub-credentials') // Create a credential in Jenkins
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building the Spring Boot application...'
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                sh 'mvn test'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image...'
+                script {
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Pushing Docker image to Docker Hub...'
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying the application...'
+                // Add your deployment steps here (e.g., SSH, Ansible, Kubernetes)
+                // Example using SSH:
+                // sshagent(['your-ssh-credentials']) {
+                //     sh 'ssh user@your-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker run -d -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"'
+                // }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up workspace...'
+            deleteDir() // Clean up the workspace after the pipeline finishes
+        }
+        failure {
+            echo 'Pipeline failed! Sending notifications...'
+            // Add your failure notification steps here (e.g., email, Slack)
+        }
+    }
+}
